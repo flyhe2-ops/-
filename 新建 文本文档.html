@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>应急物资管理系统 · 扫码领用</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --primary: #1677ff;
+      --primary-dark: #0958d9;
+      --primary-light: #e6f4ff;
+      --success: #52c41a;
+      --warning: #faad14;
+      --danger: #ff4d4f;
+      --bg: #f0f2f5;
+      --card-bg: #ffffff;
+      --text: #262626;
+      --text-secondary: #8c8c8c;
+      --border: #e8e8e8;
+      --shadow: 0 2px 12px rgba(0,0,0,0.06);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); line-height:1.6; min-height:100vh; }
+    .header { background:var(--card-bg); border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; flex-wrap:wrap; gap:8px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+    .header .logo { display:flex; align-items:center; gap:10px; font-size:18px; font-weight:700; color:var(--primary); }
+    .header .quick-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn { padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-size:14px; font-weight:500; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; transition:0.2s; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover { background:var(--primary-dark); }
+    .btn-outline { background:#fff; color:var(--primary); border:1.5px solid var(--primary); }
+    .btn-outline:hover { background:var(--primary-light); }
+    .btn-qr { background:#1e1e1e; color:#fff; font-weight:600; }
+    .btn-qr:hover { background:#333; }
+    .btn-sm { padding:5px 12px; font-size:12px; }
+    .btn-xs { padding:3px 10px; font-size:11px; border-radius:4px; }
+    .btn-danger { background:#fff; color:var(--danger); border:1.5px solid var(--danger); }
+    .btn-danger:hover { background:#fff1f0; }
+    .btn-success { background:var(--success); color:#fff; }
+    .btn-warning { background:var(--warning); color:#fff; }
+    .nav-tabs { display:flex; background:var(--card-bg); border-bottom:2px solid var(--border); padding:0 20px; overflow-x:auto; position:sticky; top:60px; z-index:99; }
+    .nav-tab { padding:14px 20px; cursor:pointer; font-size:14px; font-weight:500; color:var(--text-secondary); border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; }
+    .nav-tab:hover { color:var(--primary); }
+    .nav-tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+    .main-container { max-width:1300px; margin:0 auto; padding:20px 16px 40px; }
+    .page { display:none; }
+    .page.active { display:block; animation:fadeIn 0.3s; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
+    .stat-card { background:var(--card-bg); border-radius:var(--radius); padding:20px 24px; box-shadow:var(--shadow); }
+    .stat-card .stat-icon { font-size:40px; margin-bottom:8px; }
+    .stat-card .stat-value { font-size:32px; font-weight:700; }
+    .stat-card .stat-label { font-size:13px; color:var(--text-secondary); }
+    .panel { background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px; margin-bottom:20px; }
+    .panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+    .panel-title { font-size:16px; font-weight:600; display:flex; align-items:center; gap:8px; }
+    .panel-title .dot { width:8px; height:8px; border-radius:50%; background:var(--primary); display:inline-block; }
+    .form-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+    .form-group { display:flex; flex-direction:column; gap:4px; flex:1; min-width:140px; }
+    .form-group label { font-size:13px; font-weight:500; color:var(--text-secondary); }
+    .form-group input, .form-group select { padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:14px; background:#fafafa; width:100%; }
+    .form-group input:focus, .form-group select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(22,119,255,0.08); }
+    .table-wrapper { overflow-x:auto; border-radius:var(--radius-sm); border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; font-size:13px; min-width:700px; }
+    table th { padding:12px 14px; text-align:left; font-weight:600; color:var(--text-secondary); font-size:12px; background:#fafafa; }
+    table td { padding:10px 14px; border-top:1px solid #f0f0f0; white-space:nowrap; }
+    .tag { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+    .tag-red { background:#fff1f0; color:#cf1322; }
+    .tag-green { background:#f6ffed; color:#389e0d; }
+    .tag-orange { background:#fffbe6; color:#d48806; }
+    .tag-gray { background:#f5f5f5; color:#8c8c8c; }
+    .stock-low { color:var(--danger); font-weight:700; }
+    .empty-state { text-align:center; padding:40px; color:var(--text-secondary); }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; display:flex; align-items:center; justify-content:center; }
+    .modal { background:#fff; border-radius:var(--radius); padding:24px; max-width:500px; width:92%; box-shadow:0 12px 40px rgba(0,0,0,0.18); position:relative; max-height:85vh; overflow-y:auto; }
+    .modal .close-btn { position:absolute; top:16px; right:20px; background:none; border:none; font-size:22px; cursor:pointer; color:#999; }
+    .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+    .qr-container { text-align:center; padding:10px; }
+    .toast-container { position:fixed; top:20px; right:20px; z-index:300; }
+    .toast { padding:12px 20px; border-radius:8px; color:#fff; font-weight:500; box-shadow:0 6px 20px rgba(0,0,0,0.2); margin-bottom:8px; animation:slideIn 0.3s; }
+    .toast-success { background:#52c41a; } .toast-error { background:#ff4d4f; } .toast-info { background:#1677ff; }
+    @keyframes slideIn { from{transform:translateX(80px);opacity:0;} to{transform:translateX(0);opacity:1;} }
+    @media (max-width:768px){ .header{padding:10px 12px;height:auto;} .btn{padding:6px 10px;font-size:12px;} .nav-tab{padding:10px 12px;font-size:12px;} }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo"><span class="icon">📦</span>应急物资管理系统</div>
+    <div class="quick-actions">
+      <button class="btn btn-qr" onclick="openEntryQrModal()">📱 领用入口二维码</button>
+      <!-- 添加物资按钮绑定管理员验证 -->
+      <button class="btn btn-primary" onclick="addItemWithAdmin()">＋ 添加物资</button>
+      <button class="btn btn-outline" onclick="exportRecords()">📥 导出记录</button>
+      <button class="btn btn-outline btn-sm" onclick="resetAllData()">🔄 重置</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs" id="navTabs">
+    <div class="nav-tab active" data-page="dashboard">📊 仪表盘</div>
+    <div class="nav-tab" data-page="items">📋 物资管理</div>
+    <div class="nav-tab" data-page="borrow">📝 领用/借还</div>
+    <div class="nav-tab" data-page="records">📜 操作记录</div>
+  </nav>
+
+  <div class="main-container">
+    <!-- 仪表盘 -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="panel"><div class="panel-header"><span class="panel-title"><span class="dot"></span>⚠️ 低库存预警</span></div><div class="table-wrapper"><table><thead><tr><th>物资</th><th>类别</th><th>库存</th><th>警戒</th><th>位置</th></tr></thead><tbody id="lowStockBody"></tbody></table></div></div>
+      <div class="panel"><div class="panel-header"><span class="panel-title"><span class="dot"></span>📌 当前借出中</span></div><div class="table-wrapper"><table><thead><tr><th>物资</th><th>借用人</th><th>数量</th><th>日期</th><th>预计归还</th></tr></thead><tbody id="activeBorrowsBody"></tbody></table></div></div>
+    </div>
+
+    <!-- 物资管理 -->
+    <div class="page" id="page-items">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title"><span class="dot"></span>📋 物资库存列表</span><div><span>共 <strong id="totalItemCount">0</strong> 种</span><button class="btn btn-outline btn-sm" onclick="openCategoryManager()" style="margin-left:8px;">⚙️ 类别管理</button></div></div>
+        <div class="table-wrapper"><table><thead><tr><th>编号</th><th>名称</th><th>类别</th><th>库存</th><th>单位</th><th>警戒</th><th>位置</th><th>操作</th></tr></thead><tbody id="itemsTableBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- 领用/借还 -->
+    <div class="page" id="page-borrow">
+      <div class="panel"><div class="panel-header"><span class="panel-title"><span class="dot" style="background:var(--danger)"></span>📤 领用登记</span></div>
+        <div class="form-row">
+          <div class="form-group"><label>物资 *</label><select id="lingyongItem"></select></div>
+          <div class="form-group"><label>数量 *</label><input type="number" id="lingyongQty" min="1" value="1"></div>
+          <div class="form-group"><label>领用人 *</label><input type="text" id="lingyongPerson" placeholder="姓名"></div>
+          <div class="form-group"><label>部门</label><input type="text" id="lingyongDept"></div>
+          <div class="form-group"><label>备注</label><input type="text" id="lingyongNotes"></div>
+          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-danger" onclick="submitLingyong()">确认领用</button></div>
+        </div>
+        <div id="lingyongStockHint" style="font-size:12px;color:var(--text-secondary);"></div>
+      </div>
+      <div class="panel"><div class="panel-header"><span class="panel-title"><span class="dot" style="background:var(--warning)"></span>📤 借用登记</span></div>
+        <div class="form-row">
+          <div class="form-group"><label>物资 *</label><select id="jieyongItem"></select></div>
+          <div class="form-group"><label>数量 *</label><input type="number" id="jieyongQty" min="1" value="1"></div>
+          <div class="form-group"><label>借用人 *</label><input type="text" id="jieyongPerson" placeholder="姓名"></div>
+          <div class="form-group"><label>部门</label><input type="text" id="jieyongDept"></div>
+          <div class="form-group"><label>预计归还</label><input type="date" id="jieyongReturnDate"></div>
+          <div class="form-group"><label>备注</label><input type="text" id="jieyongNotes"></div>
+          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-warning" onclick="submitJieyong()">确认借出</button></div>
+        </div>
+        <div id="jieyongStockHint" style="font-size:12px;color:var(--text-secondary);"></div>
+      </div>
+      <div class="panel"><div class="panel-header"><span class="panel-title"><span class="dot" style="background:var(--success)"></span>📥 归还登记</span></div>
+        <div class="form-row">
+          <div class="form-group"><label>物资 *</label><select id="guihuanItem"></select></div>
+          <div class="form-group"><label>借用记录 *</label><select id="guihuanBorrowRecord"></select></div>
+          <div class="form-group"><label>归还数量 *</label><input type="number" id="guihuanQty" min="1" value="1"></div>
+          <div class="form-group"><label>归还人</label><input type="text" id="guihuanPerson"></div>
+          <div class="form-group"><label>备注</label><input type="text" id="guihuanNotes"></div>
+          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" onclick="submitGuihuan()">确认归还</button></div>
+        </div>
+        <div id="guihuanHint" style="font-size:12px;color:var(--text-secondary);"></div>
+      </div>
+    </div>
+
+    <!-- 操作记录 -->
+    <div class="page" id="page-records">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title"><span class="dot"></span>📜 所有操作记录</span>
+          <div style="display:flex;gap:8px;">
+            <select id="recordFilterType" onchange="renderRecords()"><option value="all">全部</option><option value="领用">领用</option><option value="借用">借用</option><option value="归还">归还</option></select>
+            <input type="date" id="recordFilterDate" onchange="renderRecords()">
+            <button class="btn btn-outline btn-sm" onclick="clearRecordFilter()">清除</button>
+          </div>
+        </div>
+        <div class="table-wrapper"><table><thead><tr><th>时间</th><th>类型</th><th>物资</th><th>数量</th><th>操作人</th><th>部门</th><th>备注</th><th>状态</th><th>操作</th></tr></thead><tbody id="recordsTableBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：添加/编辑物资 -->
+  <div class="modal-overlay" id="addItemModal" style="display:none;">
+    <div class="modal"><button class="close-btn" onclick="closeAddItemModal()">×</button>
+      <h3 id="addItemModalTitle">📦 添加物资</h3>
+      <div class="form-group"><label>名称 *</label><input type="text" id="itemName"></div>
+      <div class="form-group"><label>类别</label><select id="itemCategory"></select></div>
+      <div class="form-row"><div class="form-group"><label>库存 *</label><input type="number" id="itemStock" min="0" value="10"></div><div class="form-group"><label>单位</label><input type="text" id="itemUnit" value="个"></div></div>
+      <div class="form-row"><div class="form-group"><label>警戒值</label><input type="number" id="itemMinStock" min="0" value="3"></div><div class="form-group"><label>存放位置</label><input type="text" id="itemLocation"></div></div>
+      <input type="hidden" id="editItemId">
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeAddItemModal()">取消</button><button class="btn btn-primary" onclick="saveItem()">保存</button></div>
+    </div>
+  </div>
+
+  <!-- 弹窗：程序入口二维码 -->
+  <div class="modal-overlay" id="entryQrModal" style="display:none;">
+    <div class="modal"><button class="close-btn" onclick="closeEntryQrModal()">×</button>
+      <h3>📱 员工领用登记入口</h3>
+      <div class="qr-container"><div id="entryQrTarget"></div></div>
+      <p style="font-size:14px; text-align:center; margin-top:12px;">员工扫描此二维码，即可打开领用/借还页面</p>
+      <div class="qr-info" id="entryQrUrl" style="background:#f5f5f5; padding:12px; border-radius:6px; font-size:12px; word-break:break-all; margin-top:10px;"></div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="downloadEntryQR()">下载二维码</button><button class="btn btn-outline" onclick="closeEntryQrModal()">关闭</button></div>
+    </div>
+  </div>
+
+  <!-- 弹窗：管理员密码 -->
+  <div class="modal-overlay" id="passwordModal" style="display:none;">
+    <div class="modal" style="max-width:360px;"><button class="close-btn" onclick="closePasswordModal()">×</button>
+      <h3>🔐 管理员验证</h3>
+      <div class="form-group"><label>管理员密码</label><input type="password" id="adminPasswordInput" onkeydown="if(event.key==='Enter') verifyPassword()"></div>
+      <div class="password-hint" style="font-size:12px;color:var(--text-secondary);margin-top:6px;">默认密码：admin123</div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closePasswordModal()">取消</button><button class="btn btn-primary" onclick="verifyPassword()">确认</button></div>
+    </div>
+  </div>
+
+  <!-- 弹窗：类别管理 -->
+  <div class="modal-overlay" id="categoryModal" style="display:none;">
+    <div class="modal" style="max-width:480px;"><button class="close-btn" onclick="closeCategoryModal()">×</button>
+      <h3>⚙️ 物资类别管理</h3>
+      <div style="margin-bottom:16px;"><div class="form-row"><div class="form-group"><input type="text" id="newCategoryName" placeholder="新类别名称"></div><button class="btn btn-primary btn-sm" onclick="addCategory()">＋ 添加</button></div></div>
+      <ul id="categoryList" style="list-style:none; max-height:220px; overflow-y:auto; border:1px solid #eee; border-radius:6px;"></ul>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeCategoryModal()">关闭</button></div>
+    </div>
+  </div>
+
+  <!-- 弹窗：编辑记录 -->
+  <div class="modal-overlay" id="editRecordModal" style="display:none;">
+    <div class="modal"><button class="close-btn" onclick="closeEditRecordModal()">×</button>
+      <h3>✏️ 编辑操作记录</h3>
+      <div class="form-group"><label>物资名称（不可修改）</label><input type="text" id="editRecordItemName" disabled></div>
+      <div class="form-group"><label>类型（不可修改）</label><input type="text" id="editRecordType" disabled></div>
+      <div class="form-row">
+        <div class="form-group"><label>数量 *</label><input type="number" id="editRecordQty" min="1" value="1"></div>
+        <div class="form-group"><label>日期</label><input type="date" id="editRecordDate"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>操作人</label><input type="text" id="editRecordPerson"></div>
+        <div class="form-group"><label>部门</label><input type="text" id="editRecordDept"></div>
+      </div>
+      <div class="form-group"><label>备注</label><input type="text" id="editRecordNotes"></div>
+      <input type="hidden" id="editRecordId">
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeEditRecordModal()">取消</button><button class="btn btn-primary" onclick="saveEditRecord()">保存修改</button></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    (function() {
+      const ADMIN_PASSWORD = 'admin123';
+      let pendingAdminCallback = null;
+      const STORAGE_ITEMS = 'emergency_items_v2';
+      const STORAGE_RECORDS = 'emergency_records_v2';
+      const STORAGE_CATEGORIES = 'emergency_categories_v2';
+
+      let items = [], records = [], categories = [];
+      const defaultCategories = ['防护用品','急救物资','消防器材','照明设备','通讯设备','工具器械','其他'];
+      const defaultItems = [
+        {id:'I001',name:'安全帽',category:'防护用品',stock:50,unit:'顶',location:'A区仓库',minStock:10},
+        {id:'I002',name:'防护服',category:'防护用品',stock:30,unit:'套',location:'A区仓库',minStock:5},
+        {id:'I003',name:'防护手套',category:'防护用品',stock:100,unit:'双',location:'B区货架',minStock:20},
+        {id:'I004',name:'急救包',category:'急救物资',stock:25,unit:'个',location:'医疗柜',minStock:5},
+        {id:'I005',name:'灭火器',category:'消防器材',stock:15,unit:'个',location:'各楼层',minStock:3},
+        {id:'I006',name:'手电筒',category:'照明设备',stock:40,unit:'个',location:'C区工具柜',minStock:8},
+        {id:'I007',name:'对讲机',category:'通讯设备',stock:20,unit:'台',location:'D区电子柜',minStock:4},
+        {id:'I008',name:'安全绳',category:'防护用品',stock:18,unit:'根',location:'A区仓库',minStock:3},
+        {id:'I009',name:'反光背心',category:'防护用品',stock:60,unit:'件',location:'B区货架',minStock:15},
+        {id:'I010',name:'应急灯',category:'照明设备',stock:12,unit:'个',location:'C区工具柜',minStock:4}
+      ];
+
+      function loadData() {
+        try {
+          items = JSON.parse(localStorage.getItem(STORAGE_ITEMS)) || JSON.parse(JSON.stringify(defaultItems));
+          records = JSON.parse(localStorage.getItem(STORAGE_RECORDS)) || [];
+          categories = JSON.parse(localStorage.getItem(STORAGE_CATEGORIES)) || [...defaultCategories];
+          if(!localStorage.getItem(STORAGE_ITEMS)) saveItems();
+          if(!localStorage.getItem(STORAGE_RECORDS)) saveRecords();
+          if(!localStorage.getItem(STORAGE_CATEGORIES)) saveCategories();
+        } catch(e) {
+          items = JSON.parse(JSON.stringify(defaultItems)); records = []; categories = [...defaultCategories];
+          saveItems(); saveRecords(); saveCategories();
+        }
+      }
+      function saveItems() { localStorage.setItem(STORAGE_ITEMS, JSON.stringify(items)); }
+      function saveRecords() { localStorage.setItem(STORAGE_RECORDS, JSON.stringify(records)); }
+      function saveCategories() { localStorage.setItem(STORAGE_CATEGORIES, JSON.stringify(categories)); }
+      function getNowDate() { const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0'); }
+      function getNowDateTime() { return getNowDate()+' '+new Date().toTimeString().split(' ')[0]; }
+      function generateId() { return 'R'+Date.now().toString(36)+Math.random().toString(36).substring(2,6); }
+      function generateItemId() { const max=items.reduce((m,i)=>Math.max(m,parseInt(i.id.replace('I',''))),0); return 'I'+String(max+1).padStart(3,'0'); }
+
+      function showToast(msg, type='info') {
+        const container = document.getElementById('toastContainer');
+        const t = document.createElement('div'); t.className='toast toast-'+type; t.textContent=msg;
+        container.appendChild(t); setTimeout(()=>t.remove(), 2500);
+      }
+
+      // 页面切换
+      function switchPage(name) {
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+        document.getElementById('page-'+name).classList.add('active');
+        document.querySelector(`.nav-tab[data-page="${name}"]`).classList.add('active');
+        if(name==='dashboard') renderDashboard();
+        if(name==='items') renderItems();
+        if(name==='borrow') { populateSelects(); updateHints(); }
+        if(name==='records') renderRecords();
+      }
+      document.getElementById('navTabs').addEventListener('click', e => {
+        const tab = e.target.closest('.nav-tab'); if(tab) switchPage(tab.dataset.page);
+      });
+
+      function populateCategorySelect() {
+        const sel = document.getElementById('itemCategory');
+        if(sel) sel.innerHTML = categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+      }
+      function populateSelects() {
+        const opts = '<option value="">-- 请选择 --</option>' + items.map(i=>`<option value="${i.id}">${i.name} (库存:${i.stock} ${i.unit})</option>`).join('');
+        ['lingyongItem','jieyongItem','guihuanItem'].forEach(id=>{ const s=document.getElementById(id); if(s) s.innerHTML=opts; });
+        updateGuihuanBorrowSelect();
+      }
+      function updateHints() {
+        const lingId=document.getElementById('lingyongItem').value;
+        const jieId=document.getElementById('jieyongItem').value;
+        document.getElementById('lingyongStockHint').textContent = lingId ? `当前库存：${(items.find(i=>i.id===lingId)||{}).stock || 0}` : '';
+        document.getElementById('jieyongStockHint').textContent = jieId ? `当前库存：${(items.find(i=>i.id===jieId)||{}).stock || 0}` : '';
+      }
+      function updateGuihuanBorrowSelect() {
+        const itemId = document.getElementById('guihuanItem').value;
+        const sel = document.getElementById('guihuanBorrowRecord');
+        if(!itemId) { sel.innerHTML='<option value="">-- 请先选择物资 --</option>'; return; }
+        const borrows = records.filter(r=>r.type==='借用' && r.status==='已借出' && r.itemId===itemId);
+        sel.innerHTML = '<option value="">-- 选择借用记录 --</option>' + borrows.map(r=>`<option value="${r.id}" data-qty="${r.quantity}" data-person="${r.person}">${r.date} ${r.person} 借出${r.quantity}</option>`).join('');
+        document.getElementById('guihuanHint').textContent = borrows.length ? `该物资有 ${borrows.length} 条未归还记录` : '无借用记录';
+      }
+      ['lingyongItem','jieyongItem'].forEach(id=>document.getElementById(id).addEventListener('change', updateHints));
+      document.getElementById('guihuanItem').addEventListener('change', updateGuihuanBorrowSelect);
+      document.getElementById('guihuanBorrowRecord').addEventListener('change', function(){
+        const opt = this.options[this.selectedIndex];
+        if(opt.dataset.qty) document.getElementById('guihuanQty').value = opt.dataset.qty;
+        if(opt.dataset.person) document.getElementById('guihuanPerson').value = opt.dataset.person;
+      });
+
+      function renderDashboard() {
+        const totalItems = items.length, totalStock = items.reduce((s,i)=>s+i.stock,0);
+        const now = getNowDate().substring(0,7);
+        const monthLing = records.filter(r=>r.type==='领用'&&r.date.startsWith(now)).reduce((s,r)=>s+r.quantity,0);
+        const activeBorrows = records.filter(r=>r.type==='借用'&&r.status==='已借出');
+        const lowItems = items.filter(i=>i.stock<=i.minStock);
+        document.getElementById('statsGrid').innerHTML = `
+          <div class="stat-card" style="border-left:4px solid var(--primary)"><div class="stat-icon">📦</div><div class="stat-value">${totalItems}</div><div class="stat-label">物资种类</div></div>
+          <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-icon">📊</div><div class="stat-value">${totalStock}</div><div class="stat-label">总库存</div></div>
+          <div class="stat-card" style="border-left:4px solid var(--warning)"><div class="stat-icon">📤</div><div class="stat-value">${monthLing}</div><div class="stat-label">本月领用</div></div>
+          <div class="stat-card" style="border-left:4px solid var(--danger)"><div class="stat-icon">📌</div><div class="stat-value">${activeBorrows.reduce((s,r)=>s+r.quantity,0)}</div><div class="stat-label">借出中</div></div>`;
+        document.getElementById('lowStockBody').innerHTML = lowItems.length ? lowItems.map(i=>`<tr><td>${i.name}</td><td>${i.category}</td><td class="stock-low">${i.stock}</td><td>${i.minStock}</td><td>${i.location||'-'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">✅ 无预警</td></tr>';
+        document.getElementById('activeBorrowsBody').innerHTML = activeBorrows.length ? activeBorrows.map(r=>`<tr><td>${r.itemName}</td><td>${r.person}</td><td>${r.quantity}</td><td>${r.date}</td><td>${r.expectedReturnDate||'-'}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">🎉 无借出</td></tr>';
+      }
+
+      function renderItems() {
+        document.getElementById('totalItemCount').textContent = items.length;
+        document.getElementById('itemsTableBody').innerHTML = items.length ? items.map(i=>{
+          const low = i.stock <= i.minStock;
+          return `<tr><td><code>${i.id}</code></td><td>${i.name}</td><td>${i.category}</td><td class="${low?'stock-low':''}">${i.stock}</td><td>${i.unit}</td><td>${i.minStock}</td><td>${i.location||'-'}</td>
+            <td>
+              <button class="btn btn-outline btn-xs" onclick="editItemWithAdmin('${i.id}')">编辑</button>
+              <button class="btn btn-danger btn-xs" onclick="deleteItemWithAdmin('${i.id}')">删除</button>
+            </td></tr>`;
+        }).join('') : '<tr><td colspan="8" class="empty-state">📭 暂无物资</td></tr>';
+      }
+
+      function renderRecords() {
+        const type = document.getElementById('recordFilterType').value;
+        const date = document.getElementById('recordFilterDate').value;
+        let filtered = [...records];
+        if(type!=='all') filtered = filtered.filter(r=>r.type===type);
+        if(date) filtered = filtered.filter(r=>r.date===date);
+        document.getElementById('recordsTableBody').innerHTML = filtered.length ? filtered.map(r=>{
+          let tag = ''; if(r.type==='领用') tag='<span class="tag tag-red">领用</span>'; else if(r.type==='借用') tag=r.status==='已借出'?'<span class="tag tag-orange">借出中</span>':'<span class="tag tag-gray">已归还</span>'; else tag='<span class="tag tag-green">归还</span>';
+          const editBtn = `<button class="btn btn-outline btn-xs" onclick="requireAdminForEditRecord('${r.id}')">编辑</button>`;
+          const delBtn = `<button class="btn btn-danger btn-xs" onclick="requireAdminForDeleteRecord('${r.id}')">删除</button>`;
+          return `<tr><td>${r.dateTime||r.date}</td><td>${tag}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.person}</td><td>${r.department||'-'}</td><td>${r.notes||'-'}</td><td>${r.status||''}</td><td>${editBtn} ${delBtn}</td></tr>`;
+        }).join('') : '<tr><td colspan="9" class="empty-state">📭 无记录</td></tr>';
+      }
+
+      // ---------- 管理员验证（核心） ----------
+      function requireAdmin(callback) {
+        pendingAdminCallback = callback;
+        document.getElementById('adminPasswordInput').value = '';
+        document.getElementById('passwordModal').style.display = 'flex';
+        document.getElementById('adminPasswordInput').focus();
+      }
+      function verifyPassword() {
+        const input = document.getElementById('adminPasswordInput');
+        if (input.value === ADMIN_PASSWORD) {
+          closePasswordModal();
+          if (pendingAdminCallback) {
+            const cb = pendingAdminCallback;
+            pendingAdminCallback = null;
+            setTimeout(cb, 100);
+          }
+        } else {
+          showToast('密码错误', 'error');
+          input.value = '';
+          input.focus();
+        }
+      }
+      function closePasswordModal() {
+        document.getElementById('passwordModal').style.display = 'none';
+        // 不清除 pendingAdminCallback，由 verifyPassword 处理
+      }
+
+      // ---------- 物资管理的权限包装 ----------
+      window.addItemWithAdmin = function() {
+        requireAdmin(() => openAddItemModal());
+      };
+      window.editItemWithAdmin = function(id) {
+        requireAdmin(() => openEditItemModal(id));
+      };
+      window.deleteItemWithAdmin = function(id) {
+        requireAdmin(() => deleteItem(id));
+      };
+
+      // ---------- 编辑/删除记录（已有） ----------
+      function requireAdminForEditRecord(recordId) {
+        requireAdmin(() => openEditRecordModal(recordId));
+      }
+      function requireAdminForDeleteRecord(recordId) {
+        requireAdmin(() => deleteRecord(recordId));
+      }
+
+      // ---------- 物资编辑/删除实际逻辑（不变） ----------
+      function openAddItemModal() {
+        document.getElementById('addItemModalTitle').textContent='📦 添加物资';
+        document.getElementById('itemName').value=''; document.getElementById('itemStock').value='10';
+        document.getElementById('itemUnit').value='个'; document.getElementById('itemMinStock').value='3';
+        document.getElementById('itemLocation').value=''; document.getElementById('editItemId').value='';
+        populateCategorySelect();
+        document.getElementById('addItemModal').style.display='flex';
+      }
+      function openEditItemModal(id) {
+        const item = items.find(i=>i.id===id); if(!item) return;
+        document.getElementById('addItemModalTitle').textContent='✏️ 编辑物资';
+        document.getElementById('itemName').value=item.name; document.getElementById('itemStock').value=item.stock;
+        document.getElementById('itemUnit').value=item.unit; document.getElementById('itemMinStock').value=item.minStock;
+        document.getElementById('itemLocation').value=item.location||''; document.getElementById('editItemId').value=id;
+        populateCategorySelect(); document.getElementById('itemCategory').value=item.category;
+        document.getElementById('addItemModal').style.display='flex';
+      }
+      function closeAddItemModal() { document.getElementById('addItemModal').style.display='none'; }
+      function saveItem() {
+        const name = document.getElementById('itemName').value.trim();
+        const category = document.getElementById('itemCategory').value;
+        const stock = parseInt(document.getElementById('itemStock').value)||0;
+        const unit = document.getElementById('itemUnit').value.trim()||'个';
+        const minStock = parseInt(document.getElementById('itemMinStock').value)||0;
+        const location = document.getElementById('itemLocation').value.trim();
+        const editId = document.getElementById('editItemId').value;
+        if(!name) return showToast('请输入名称','error');
+        if(editId) {
+          const item = items.find(i=>i.id===editId);
+          if(item) { item.name=name; item.category=category; item.stock=stock; item.unit=unit; item.minStock=minStock; item.location=location; saveItems(); showToast('已更新','success'); }
+        } else {
+          items.push({id:generateItemId(),name,category,stock,unit,location,minStock}); saveItems(); showToast('已添加','success');
+        }
+        closeAddItemModal(); renderItems(); renderDashboard(); populateSelects();
+      }
+      function deleteItem(id) {
+        if(!confirm('确定删除该物资吗？')) return;
+        items = items.filter(i=>i.id!==id); saveItems(); renderItems(); renderDashboard(); populateSelects(); showToast('已删除','info');
+      }
+
+      // ---------- 记录编辑/删除 ----------
+      function openEditRecordModal(recordId) {
+        const record = records.find(r => r.id === recordId);
+        if (!record) { showToast('记录不存在', 'error'); return; }
+        document.getElementById('editRecordId').value = recordId;
+        document.getElementById('editRecordItemName').value = record.itemName;
+        document.getElementById('editRecordType').value = record.type;
+        document.getElementById('editRecordQty').value = record.quantity;
+        document.getElementById('editRecordDate').value = record.date;
+        document.getElementById('editRecordPerson').value = record.person || '';
+        document.getElementById('editRecordDept').value = record.department || '';
+        document.getElementById('editRecordNotes').value = record.notes || '';
+        document.getElementById('editRecordModal').style.display = 'flex';
+      }
+      function closeEditRecordModal() { document.getElementById('editRecordModal').style.display = 'none'; }
+      function saveEditRecord() {
+        const recordId = document.getElementById('editRecordId').value;
+        const record = records.find(r => r.id === recordId);
+        if (!record) { showToast('记录不存在', 'error'); return; }
+        const newQty = parseInt(document.getElementById('editRecordQty').value) || 0;
+        if (newQty < 1) return showToast('数量至少为1', 'error');
+        const oldQty = record.quantity;
+        const diff = newQty - oldQty;
+        const item = items.find(i => i.id === record.itemId);
+        if (!item) { showToast('关联物资已不存在', 'error'); return; }
+        if (record.type === '领用' || record.type === '借用') {
+          const newStock = item.stock - diff;
+          if (newStock < 0) return showToast(`库存不足（当前 ${item.stock}，差值 ${diff}）`, 'error');
+          item.stock = newStock;
+        } else if (record.type === '归还') {
+          const newStock = item.stock + diff;
+          if (newStock < 0) return showToast(`库存不足（当前 ${item.stock}，差值 ${diff}）`, 'error');
+          item.stock = newStock;
+        }
+        record.quantity = newQty;
+        record.date = document.getElementById('editRecordDate').value || getNowDate();
+        record.person = document.getElementById('editRecordPerson').value.trim() || '';
+        record.department = document.getElementById('editRecordDept').value.trim() || '';
+        record.notes = document.getElementById('editRecordNotes').value.trim() || '';
+        saveItems(); saveRecords();
+        showToast('记录已更新', 'success');
+        closeEditRecordModal();
+        renderRecords(); renderDashboard(); renderItems(); populateSelects();
+      }
+      function deleteRecord(recordId) {
+        const record = records.find(r => r.id === recordId);
+        if (!record) { showToast('记录不存在', 'error'); return; }
+        if (!confirm(`确定删除此记录吗？\n${record.itemName} ${record.type} ${record.quantity} 件`)) return;
+        const item = items.find(i => i.id === record.itemId);
+        if (item) {
+          if (record.type === '领用' || record.type === '借用') item.stock += record.quantity;
+          else if (record.type === '归还') {
+            item.stock -= record.quantity;
+            if (item.stock < 0) { showToast('库存已修正为0', 'error'); item.stock = 0; }
+          }
+          saveItems();
+        }
+        records = records.filter(r => r.id !== recordId);
+        saveRecords();
+        showToast('记录已删除', 'info');
+        renderRecords(); renderDashboard(); renderItems(); populateSelects();
+      }
+
+      // ---------- 其他功能（类别管理、重置、导出、领用/借用/归还） ----------
+      function openCategoryManager() {
+        requireAdmin(() => {
+          document.getElementById('categoryModal').style.display='flex';
+          renderCategoryList();
+        });
+      }
+      function closeCategoryModal() { document.getElementById('categoryModal').style.display='none'; }
+      function renderCategoryList() {
+        const ul = document.getElementById('categoryList');
+        ul.innerHTML = categories.map(c=>`<li style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #eee;"><span>${c}</span><button class="btn btn-danger btn-xs" onclick="deleteCategory('${c}')">删除</button></li>`).join('');
+      }
+      function addCategory() {
+        const name = document.getElementById('newCategoryName').value.trim();
+        if(!name) return showToast('请输入类别名称','error');
+        if(categories.includes(name)) return showToast('类别已存在','error');
+        categories.push(name); saveCategories(); renderCategoryList(); populateCategorySelect();
+        document.getElementById('newCategoryName').value=''; showToast('类别已添加','success');
+      }
+      function deleteCategory(cat) {
+        if(items.some(i=>i.category===cat)) return showToast('该类别正在使用，无法删除','error');
+        if(!confirm(`确定删除“${cat}”？`)) return;
+        categories = categories.filter(c=>c!==cat); saveCategories(); renderCategoryList(); populateCategorySelect(); showToast('已删除','info');
+      }
+
+      function resetAllData() {
+        requireAdmin(() => {
+          if(!confirm('重置将恢复默认物资和类别，清空所有记录。确定？')) return;
+          items = JSON.parse(JSON.stringify(defaultItems)); records = []; categories = [...defaultCategories];
+          saveItems(); saveRecords(); saveCategories();
+          showToast('已重置','info'); switchPage('dashboard'); renderItems(); populateSelects(); populateCategorySelect();
+        });
+      }
+
+      function exportRecords() {
+        if(!records.length) return showToast('无记录','info');
+        const csv = '时间,类型,物资,数量,操作人,部门,备注,状态\n' + records.map(r=>`${r.dateTime||r.date},${r.type},"${r.itemName}",${r.quantity},"${r.person}","${r.department||''}","${(r.notes||'').replace(/"/g,'""')}",${r.status||''}`).join('\n');
+        const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `记录_${getNowDate()}.csv`; a.click();
+        showToast('导出成功','success');
+      }
+
+      function submitLingyong() {
+        const itemId=document.getElementById('lingyongItem').value;
+        const qty=parseInt(document.getElementById('lingyongQty').value);
+        const person=document.getElementById('lingyongPerson').value.trim();
+        if(!itemId||!qty||!person) return showToast('请填写完整','error');
+        const item=items.find(i=>i.id===itemId);
+        if(item.stock<qty) return showToast('库存不足','error');
+        item.stock-=qty; saveItems();
+        records.unshift({id:generateId(),itemId:item.id,itemName:item.name,type:'领用',quantity:qty,person,department:document.getElementById('lingyongDept').value,date:getNowDate(),dateTime:getNowDateTime(),notes:document.getElementById('lingyongNotes').value,status:'已完成'});
+        saveRecords();
+        showToast('领用成功','success');
+        populateSelects(); renderDashboard(); renderItems(); renderRecords();
+      }
+      function submitJieyong() {
+        const itemId=document.getElementById('jieyongItem').value;
+        const qty=parseInt(document.getElementById('jieyongQty').value);
+        const person=document.getElementById('jieyongPerson').value.trim();
+        if(!itemId||!qty||!person) return showToast('请填写完整','error');
+        const item=items.find(i=>i.id===itemId);
+        if(item.stock<qty) return showToast('库存不足','error');
+        item.stock-=qty; saveItems();
+        records.unshift({id:generateId(),itemId:item.id,itemName:item.name,type:'借用',quantity:qty,person,department:document.getElementById('jieyongDept').value,date:getNowDate(),dateTime:getNowDateTime(),notes:document.getElementById('jieyongNotes').value,status:'已借出',expectedReturnDate:document.getElementById('jieyongReturnDate').value});
+        saveRecords();
+        showToast('借出成功','success');
+        populateSelects(); renderDashboard(); renderItems(); renderRecords();
+      }
+      function submitGuihuan() {
+        const itemId=document.getElementById('guihuanItem').value;
+        const borrowId=document.getElementById('guihuanBorrowRecord').value;
+        const qty=parseInt(document.getElementById('guihuanQty').value);
+        const person=document.getElementById('guihuanPerson').value.trim();
+        if(!itemId||!borrowId||!qty||!person) return showToast('请填写完整','error');
+        const borrow=records.find(r=>r.id===borrowId);
+        if(!borrow||borrow.status!=='已借出') return showToast('记录无效','error');
+        if(qty>borrow.quantity) return showToast('超过借出数量','error');
+        const item=items.find(i=>i.id===itemId);
+        item.stock+=qty; saveItems();
+        if(qty>=borrow.quantity){ borrow.status='已归还'; } else { borrow.quantity-=qty; borrow.notes=(borrow.notes||'')+' 已还'+qty; }
+        saveRecords();
+        records.unshift({id:generateId(),itemId:item.id,itemName:item.name,type:'归还',quantity:qty,person,department:borrow.department,date:getNowDate(),dateTime:getNowDateTime(),notes:document.getElementById('guihuanNotes').value,status:'已完成'});
+        saveRecords();
+        showToast('归还成功','success');
+        populateSelects(); renderDashboard(); renderItems(); renderRecords();
+      }
+
+      // 二维码
+      let entryQRInstance = null;
+      function openEntryQrModal() {
+        const url = window.location.href.split('?')[0] + '?page=borrow';
+        document.getElementById('entryQrModal').style.display='flex';
+        document.getElementById('entryQrUrl').textContent = url;
+        document.getElementById('entryQrTarget').innerHTML = '';
+        setTimeout(() => {
+          if(entryQRInstance) entryQRInstance.clear();
+          entryQRInstance = new QRCode(document.getElementById('entryQrTarget'), {
+            text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M
+          });
+        }, 150);
+      }
+      function closeEntryQrModal() {
+        document.getElementById('entryQrModal').style.display='none';
+        if(entryQRInstance) { entryQRInstance.clear(); entryQRInstance=null; }
+        document.getElementById('entryQrTarget').innerHTML = '';
+      }
+      function downloadEntryQR() {
+        const canvas = document.querySelector('#entryQrTarget canvas');
+        if(!canvas) return;
+        const a = document.createElement('a'); a.download = '应急物资领用入口.png'; a.href = canvas.toDataURL(); a.click();
+      }
+
+      // 事件绑定
+      document.getElementById('addItemModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeAddItemModal(); });
+      document.getElementById('entryQrModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeEntryQrModal(); });
+      document.getElementById('passwordModal').addEventListener('click', e => { if(e.target===e.currentTarget) closePasswordModal(); });
+      document.getElementById('categoryModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeCategoryModal(); });
+      document.getElementById('editRecordModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeEditRecordModal(); });
+      document.addEventListener('keydown', e => { if(e.key==='Escape') { closeAddItemModal(); closeEntryQrModal(); closePasswordModal(); closeCategoryModal(); closeEditRecordModal(); } });
+
+      function checkUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const page = params.get('page');
+        if(page && ['dashboard','items','borrow','records'].includes(page)) switchPage(page);
+      }
+
+      // 初始化
+      loadData(); populateCategorySelect(); populateSelects();
+      renderDashboard(); renderItems(); renderRecords();
+      checkUrlParams();
+
+      // 暴露全局函数
+      window.switchPage = switchPage;
+      window.openAddItemModal = openAddItemModal; window.openEditItemModal = openEditItemModal;
+      window.closeAddItemModal = closeAddItemModal; window.saveItem = saveItem; window.deleteItem = deleteItem;
+      window.submitLingyong = submitLingyong; window.submitJieyong = submitJieyong; window.submitGuihuan = submitGuihuan;
+      window.exportRecords = exportRecords; window.resetAllData = resetAllData;
+      window.openCategoryManager = openCategoryManager; window.closeCategoryModal = closeCategoryModal;
+      window.addCategory = addCategory; window.deleteCategory = deleteCategory;
+      window.openEntryQrModal = openEntryQrModal; window.closeEntryQrModal = closeEntryQrModal; window.downloadEntryQR = downloadEntryQR;
+      window.verifyPassword = verifyPassword; window.closePasswordModal = closePasswordModal;
+      window.clearRecordFilter = () => { document.getElementById('recordFilterType').value='all'; document.getElementById('recordFilterDate').value=''; renderRecords(); };
+      window.renderRecords = renderRecords;
+      window.requireAdminForEditRecord = requireAdminForEditRecord;
+      window.requireAdminForDeleteRecord = requireAdminForDeleteRecord;
+      window.openEditRecordModal = openEditRecordModal;
+      window.closeEditRecordModal = closeEditRecordModal;
+      window.saveEditRecord = saveEditRecord;
+      window.deleteRecord = deleteRecord;
+      // 新增权限包装函数
+      window.addItemWithAdmin = addItemWithAdmin;
+      window.editItemWithAdmin = editItemWithAdmin;
+      window.deleteItemWithAdmin = deleteItemWithAdmin;
+    })();
+  </script>
+</body>
+</html>
